@@ -436,6 +436,7 @@ function Ink3D(key, cfg){
   const ptr = track(host), E = engine3d(glc);
   const FSC = 3, field = document.createElement('canvas'), fctx = field.getContext('2d');
   const cardC = document.createElement('canvas'); cardC.width = 1024; cardC.height = 512; const cctx = cardC.getContext('2d');
+  let frozenAt = null;
   let parts = [], last = performance.now(), clock = 0, cyc = 0, lastW = 0, nth = 0, L = null, cam = null, light = [-.6, .6, .55], cardKey = '';
   function geom(w, h){
     const lw = w < 700 ? Math.min(280, w - 90) : Math.round(clamp(w * .3, 380, 480)), lh = Math.round(lw * .64);
@@ -499,6 +500,7 @@ function Ink3D(key, cfg){
       const want = clamp(Math.round(w * h / 153), 750, 3900);
       if (lastW !== w){ lastW = w; parts = []; }
       const prev = cyc; cyc = RM ? cfg.still : clock % cfg.cycle;
+      if (cfg.hold){ if (frozenAt === null && !RM && cyc >= cfg.hold && L && L.done) frozenAt = cfg.hold; if (frozenAt !== null) cyc = frozenAt; }
       if (!L && (cyc < prev || (cyc > 1.3 && cyc < 1.5) || RM)) L = {g, frozen: [], code: serial(9000 + nth++), done: false, typed: 0, chip: 0, fd: null};
       if (L && !L.done && (cyc >= 1.9 || RM)){
         L.done = true;
@@ -565,7 +567,7 @@ const makers = {
       typed: smooth(8.3, 8.9, c), chip: c > 9.0 ? 1 : 0, fade: smooth(9.9, 10.5, c)};
   }}),
   // 5d · the specks are drops in the air; the label catches them one at a time
-  drops: () => Ink3D('drops', {cycle: 10.5, still: 6.4, rmax: 9, tagZ: 150,
+  drops: () => Ink3D('drops', {cycle: 10.5, still: 6.4, rmax: 9, tagZ: 150, hold: 9.0,
     freeze(L){
       const idx = L.frozen.map((_, i) => i);
       for (let i = idx.length - 1; i > 0; i--){ const j = Math.floor(Math.random() * (i + 1)); [idx[i], idx[j]] = [idx[j], idx[i]]; }
