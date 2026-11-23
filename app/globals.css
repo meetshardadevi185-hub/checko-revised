@@ -79,7 +79,7 @@ h1 { font-family: var(--display); font-weight: 500; font-size: clamp(44px, 5.4vw
 .topo-hero-inner { position: relative; width: 100%; display: flex; flex-direction: column; align-items: center; }
 .topo-hero-bleed { position: absolute; left: 0; right: 0; top: -88px; bottom: 0; touch-action: pan-y; }
 .topo-hero-bleed canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
-.topo-hero-stage { position: relative; width: 100%; height: calc(100svh - 88px); min-height: 520px; max-height: 860px; pointer-events: none; }
+.topo-hero-stage { position: relative; width: 100%; height: calc(100svh - 168px); min-height: 460px; max-height: 760px; pointer-events: none; }
 .i3-tag { display: none; }
 .th-cue { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 26px; font-size: 13px; letter-spacing: .08em; text-transform: uppercase; color: var(--body, #50555a); text-decoration: none; opacity: 0; transform: translateY(12px); transition: opacity .7s ease, transform .7s ease; pointer-events: none; }
 .th-reveal.on .th-cue { opacity: 1; transform: none; transition-delay: 1.3s; pointer-events: auto; }
