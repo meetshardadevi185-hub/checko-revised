@@ -625,7 +625,7 @@ function Topo(cv, host){
   const vs = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
   const fs = `${der ? '#extension GL_OES_standard_derivatives : enable\n#define DER\n' : ''}precision highp float;
   uniform vec2 res; uniform float t, dpr, cg, tbk; uniform vec3 m; uniform vec4 tb, cd;
-  const float N = 22.;
+  const float N = 18.;
   float hs(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   float vn(vec2 p){ vec2 i = floor(p), f = fract(p), u = f * f * f * (f * (f * 6. - 15.) + 10.);
     return mix(mix(hs(i), hs(i + vec2(1., 0.)), u.x), mix(hs(i + vec2(0., 1.)), hs(i + vec2(1., 1.)), u.x), u.y); }
@@ -639,9 +639,14 @@ function Topo(cv, host){
     float h = fbm(p + w) * 1.1 + ridge(p * .8 + w * .5) * .55;
     vec2 d = (px - m.xy) / 190.; h += m.z * exp(-dot(d, d));
     // the ground rises into a plateau under the card: contour rings hug it the way they hugged the wordmark
-    vec2 q = abs(px - cd.xy) - cd.zw; float sd = length(max(q, 0.)) + min(max(q.x, q.y), 0.) - 14.;
-    float wg = cg * (1. - smoothstep(50., 300., sd));
-    h = mix(h, (14. - sd / 11.) / N, wg);
+    float rr = min(cd.z, cd.w) * .95;
+    vec2 q = abs(px - cd.xy) - (cd.zw - rr); float sd = length(max(q, 0.)) + min(max(q.x, q.y), 0.) - rr;
+    // soften the corners into an organic island: the farther out, the rounder and more wavy the ring
+    float far = smoothstep(0., 220., sd);
+    sd = mix(sd, length((px - cd.xy) / (cd.zw + 60.)) * (min(cd.z, cd.w) + 60.) - rr * .2, far * .6);
+    sd += (fbm(px / 210. + 3.1) - .5) * 90. * far;
+    float wg = cg * (1. - smoothstep(80., 430., sd));
+    h = mix(h, (12. - sd / 24.) / N, wg);
     return h;
   }
   void main(){
@@ -661,12 +666,12 @@ function Topo(cv, host){
     vec3 n = normalize(vec3(-g * 70., 1.)); float sh = clamp(dot(n, normalize(vec3(-.6, -.6, .55))), 0., 1.);
     vec3 paper = vec3(1.) * (.975 + .025 * sh);
     vec2 dm = (px - m.xy) / 260.; float near = exp(-dot(dm, dm)) * clamp(m.z / .55, 0., 1.);
-    float a = max(line * (.5 + .2 * near), idx * (.72 + .15 * near));
+    float a = max(line * (.28 + .12 * near), idx * (.42 + .12 * near));
     float ty = smoothstep(tb.x - 50., tb.x + 10., px.y) * (1. - smoothstep(tb.y - 30., tb.y + 40., px.y));
     float tx = 1. - smoothstep(tb.w * .8, tb.w * 1.25, abs(px.x - tb.z));
     a *= 1. - .85 * tbk * ty * tx;
     a *= 1. - smoothstep(res.y / dpr - 90., res.y / dpr, px.y);
-    gl_FragColor = vec4(mix(paper, vec3(.04, .045, .05), a), 1.);
+    gl_FragColor = vec4(mix(paper, vec3(.1, .11, .12), a), 1.);
   }`;
   const sh = (type, s) => { const o = gl.createShader(type); gl.shaderSource(o, s); gl.compileShader(o); if (!gl.getShaderParameter(o, gl.COMPILE_STATUS)) console.warn(gl.getShaderInfoLog(o)); return o; };
   const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr); gl.useProgram(pr);
