@@ -6,6 +6,8 @@ export function startInkDrops() {
 let RM = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const TAU = Math.PI * 2, DEG = Math.PI / 180;
 const C = {white:'#FFFFFF', char:'#1A1D1F', body:'#50555A', line:'#E6E8E6', honey:'#F2C14E', green:'#4EAB47', error:'#B42318'};
+const SHARED = {x: 0, y: 0, hw: 0, hh: 0, gt: 0, g: 0, tbk: 0};
+let readyFired = false;
 const LOGO = new Image(); LOGO.src = '/assets/checko-card-logo.png';
 
 
@@ -504,7 +506,7 @@ function Ink3D(key, cfg){
         L.end = .4 * Math.sqrt(L.g.win.w * L.g.win.h / L.frozen.length);
         if (cfg.freeze) cfg.freeze(L);
       }
-      if (!L || !L.done){ glc.style.opacity = 0; tagEl.classList.remove('on'); return; }
+      if (!L || !L.done){ glc.style.opacity = 0; tagEl.classList.remove('on'); SHARED.gt = 0; return; }
       const G = L.g, cx = G.x + G.w / 2, cy = G.y + G.h / 2;
       const R = [-G.w / 2 + 16, G.h / 2 - 38 - G.win.h, G.win.w, G.win.h];
       const over = ptr.in && Math.abs(ptr.x - cx) < G.w * .9 && Math.abs(ptr.y - cy) < G.h * 1.3;
@@ -514,6 +516,8 @@ function Ink3D(key, cfg){
       if (!cam || RM) cam = aim; else for (const k in aim) cam[k] += (aim[k] - cam[k]) * .14;
       light = light.map((v, i) => v + (S.light[i] - v) * .12);
       L.typed = RM ? 99 : Math.floor(S.typed * L.code.length); L.chip = RM ? 1 : S.chip;
+      SHARED.x = cx; SHARED.y = cy; SHARED.hw = G.w / 2; SHARED.hh = G.h / 2; SHARED.gt = RM ? 1 : smooth(2.0, 4.5, cyc) * (1 - (S.fade || 0));
+      if (L.chip >= 1 && !readyFired){ readyFired = true; host.dispatchEvent(new CustomEvent('cardready')); }
       glc.style.opacity = String((RM ? 1 : smooth(1.9, 2.4, cyc)) * (1 - (S.fade || 0)));
       if (!E) return;
       paintField(cfg.blobs ? cfg.blobs(L, cyc) : L.frozen.map(p => ({x: p.x, y: p.y, s: p.r * .85 + (L.end * p.k - p.r * .85) * S.melt, a: 1})));
@@ -618,7 +622,8 @@ function Topo(cv, host){
   const der = !!gl.getExtension('OES_standard_derivatives');
   const vs = 'attribute vec2 p;void main(){gl_Position=vec4(p,0.,1.);}';
   const fs = `${der ? '#extension GL_OES_standard_derivatives : enable\n#define DER\n' : ''}precision highp float;
-  uniform vec2 res; uniform float t, dpr; uniform vec3 m; uniform vec4 tb;
+  uniform vec2 res; uniform float t, dpr, cg, tbk; uniform vec3 m; uniform vec4 tb, cd;
+  const float N = 22.;
   float hs(vec2 p){ p = fract(p * vec2(123.34, 456.21)); p += dot(p, p + 45.32); return fract(p.x * p.y); }
   float vn(vec2 p){ vec2 i = floor(p), f = fract(p), u = f * f * f * (f * (f * 6. - 15.) + 10.);
     return mix(mix(hs(i), hs(i + vec2(1., 0.)), u.x), mix(hs(i + vec2(0., 1.)), hs(i + vec2(1., 1.)), u.x), u.y); }
@@ -631,11 +636,15 @@ function Topo(cv, host){
     vec2 w = vec2(fbm(p + 5.2), fbm(p + 1.3)) * .9;
     float h = fbm(p + w) * 1.1 + ridge(p * .8 + w * .5) * .55;
     vec2 d = (px - m.xy) / 190.; h += m.z * exp(-dot(d, d));
+    // the ground rises into a plateau under the card: contour rings hug it the way they hugged the wordmark
+    vec2 q = abs(px - cd.xy) - cd.zw; float sd = length(max(q, 0.)) + min(max(q.x, q.y), 0.) - 14.;
+    float wg = cg * (1. - smoothstep(50., 300., sd));
+    h = mix(h, (14. - sd / 11.) / N, wg);
     return h;
   }
   void main(){
     vec2 px = vec2(gl_FragCoord.x, res.y - gl_FragCoord.y) / dpr;
-    float h = H(px), N = 15.;
+    float h = H(px);
     float v = h * N;
   #ifdef DER
     float fw = fwidth(v); vec2 g = vec2(dFdx(h), dFdy(h)) * dpr;
@@ -650,10 +659,10 @@ function Topo(cv, host){
     vec3 n = normalize(vec3(-g * 70., 1.)); float sh = clamp(dot(n, normalize(vec3(-.6, -.6, .55))), 0., 1.);
     vec3 paper = vec3(1.) * (.975 + .025 * sh);
     vec2 dm = (px - m.xy) / 260.; float near = exp(-dot(dm, dm)) * clamp(m.z / .55, 0., 1.);
-    float a = max(line * (.42 + .2 * near), idx * (.72 + .2 * near));
+    float a = max(line * (.5 + .2 * near), idx * (.72 + .15 * near));
     float ty = smoothstep(tb.x - 50., tb.x + 10., px.y) * (1. - smoothstep(tb.y - 30., tb.y + 40., px.y));
     float tx = 1. - smoothstep(tb.w * .8, tb.w * 1.25, abs(px.x - tb.z));
-    a *= 1. - .88 * ty * tx;
+    a *= 1. - .85 * tbk * ty * tx;
     a *= 1. - smoothstep(res.y / dpr - 90., res.y / dpr, px.y);
     gl_FragColor = vec4(mix(paper, vec3(.04, .045, .05), a), 1.);
   }`;
@@ -661,7 +670,7 @@ function Topo(cv, host){
   const pr = gl.createProgram(); gl.attachShader(pr, sh(gl.VERTEX_SHADER, vs)); gl.attachShader(pr, sh(gl.FRAGMENT_SHADER, fs)); gl.linkProgram(pr); gl.useProgram(pr);
   const b = gl.createBuffer(); gl.bindBuffer(gl.ARRAY_BUFFER, b); gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1, -1, 1, -1, -1, 1, 1, 1]), gl.STATIC_DRAW);
   const loc = gl.getAttribLocation(pr, 'p'); gl.enableVertexAttribArray(loc); gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
-  const U = n => gl.getUniformLocation(pr, n), uRes = U('res'), uT = U('t'), uD = U('dpr'), uM = U('m'), uTB = U('tb');
+  const U = n => gl.getUniformLocation(pr, n), uRes = U('res'), uT = U('t'), uD = U('dpr'), uM = U('m'), uTB = U('tb'), uCD = U('cd'), uCG = U('cg'), uTBK = U('tbk');
   const ptr = track(host), M = {x: 0, y: 0, a: 0};
   let t0 = performance.now(), first = true;
   return {frame(now){
@@ -676,7 +685,10 @@ function Topo(cv, host){
     gl.viewport(0, 0, W, Hh);
     gl.uniform2f(uRes, W, Hh); gl.uniform1f(uD, d); gl.uniform1f(uT, RM ? 0 : (now - t0) / 1000);
     gl.uniform3f(uM, M.x, M.y, M.a);
+    SHARED.g += (SHARED.gt - SHARED.g) * .05;
+    gl.uniform4f(uCD, SHARED.x, SHARED.y, SHARED.hw * 1.04, SHARED.hh * 1.04); gl.uniform1f(uCG, SHARED.g);
     const tr = document.querySelector('.th-reveal');
+    SHARED.tbk += ((tr && tr.classList.contains('on') ? 1 : 0) - SHARED.tbk) * .06; gl.uniform1f(uTBK, SHARED.tbk);
     if (tr){ const q = tr.getBoundingClientRect(); gl.uniform4f(uTB, q.top - r.top, q.bottom - r.top, q.left - r.left + q.width / 2, q.width / 2); } else gl.uniform4f(uTB, 1e5, 1e5, 0, 1);
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
   }};
